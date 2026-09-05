@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cat 7A Destroyer — Admin</title>
+<style>
+  :root{
+    --navy-dark:#1D364B; --navy-bg:#2A5073; --navy-card:#354C61;
+    --gold:#E7B44A; --muted:#92A3B5; --success:#77DA89; --error:#E05252;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--navy-bg); color:#fff; min-height:100vh;
+    padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom);
+    padding-left:env(safe-area-inset-left); padding-right:env(safe-area-inset-right);
+  }
+  header{background:var(--navy-dark); padding:20px 24px; display:flex; align-items:center; justify-content:space-between;}
+  header h1{margin:0; font-size:20px;}
+  header p{margin:4px 0 0; color:var(--muted); font-size:13px;}
+  .logout-btn{background:transparent; border:1px solid var(--muted); color:var(--muted); border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer; width:auto;}
+  .logout-btn:hover{border-color:var(--gold); color:var(--gold);}
+  main{padding:20px; max-width:900px; margin:0 auto;}
+  .login-box{max-width:340px; margin:80px auto; text-align:center;}
+  input{background:var(--navy-card); border:1px solid var(--muted); color:#fff; border-radius:10px; padding:14px; font-size:16px; width:100%; margin-bottom:10px;}
+  button{background:var(--gold); color:var(--navy-dark); border:none; border-radius:10px; padding:14px; font-size:15px; font-weight:700; width:100%; cursor:pointer;}
+  .tech-card{background:var(--navy-card); border-radius:12px; padding:18px; margin-bottom:14px;}
+  .tech-name{font-size:16px; font-weight:700; margin-bottom:2px;}
+  .tech-username{color:var(--muted); font-size:13px; margin-bottom:12px;}
+  .stat-row{display:flex; gap:16px; flex-wrap:wrap; font-size:13px; margin-bottom:10px;}
+  .stat{color:var(--muted);}
+  .stat b{color:#fff;}
+  .progress-bar-mini{height:6px; background:var(--navy-dark); border-radius:3px; overflow:hidden; margin-top:8px;}
+  .progress-bar-mini > div{height:100%; background:var(--gold);}
+  .badges{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;}
+  .badge-chip{background:var(--navy-dark); border:1px solid var(--gold); color:var(--gold); border-radius:12px; padding:3px 10px; font-size:11px;}
+  .error{color:var(--error); font-size:13px; text-align:center;}
+  #admin-error{color:var(--error); font-size:13px; text-align:center; min-height:16px;}
+</style>
+</head>
+<body>
+
+<div id="login-screen" class="login-box">
+  <h2>Admin Access</h2>
+  <p style="color:#92A3B5;font-size:13px;">Cat 7A Destroyer — owner console</p>
+  <input type="text" id="admin-username" placeholder="Username">
+  <input type="tel" id="admin-pin" placeholder="6-digit PIN" inputmode="numeric" maxlength="6">
+  <div id="admin-error"></div>
+  <button id="admin-login-btn">Log In</button>
+</div>
+
+<div id="admin-screen" style="display:none;">
+  <header>
+    <div>
+      <h1>Technician Progress</h1>
+      <p id="tech-count-label">Loading...</p>
+    </div>
+    <button class="logout-btn" id="admin-logout-btn">Log Out</button>
+  </header>
+  <main id="tech-list"></main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script>
+// Defense-in-depth: hardcoded admin UID allowlist, checked here AND enforced
+// server-side by Firestore security rules (see project notes).
+//
+// *** This is a NEW Firebase project (see config.js), so the admin UID from
+// Core Killer will NOT work here. Sign up as normal in the app once, find
+// your new UID in Firebase Console -> Authentication -> Users, and paste it
+// below (and in firestore.rules) before this console will grant you access. ***
+const ADMIN_UIDS = [
+  "REPLACE_WITH_YOUR_NEW_PROJECT_ADMIN_UID"
+];
+
+document.getElementById('admin-login-btn').addEventListener('click', async () => {
+  const username = document.getElementById('admin-username').value.trim();
+  const pin = document.getElementById('admin-pin').value.trim();
+  const errEl = document.getElementById('admin-error');
+  errEl.textContent = '';
+  try {
+    const cred = await logIn(username, pin);
+  } catch (err) {
+    errEl.textContent = friendlyAuthError(err);
+  }
+});
+
+auth.onAuthStateChanged(async (user) => {
+  if (!user) return;
+  if (!ADMIN_UIDS.includes(user.uid)) {
+    document.getElementById('admin-error').textContent = 'This account is not authorized for admin access.';
+    await auth.signOut();
+    return;
+  }
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('admin-screen').style.display = 'block';
+  loadAllTechnicians();
+});
+
+document.getElementById('admin-logout-btn').addEventListener('click', async () => {
+  await auth.signOut();
+  document.getElementById('admin-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'block';
+  document.getElementById('admin-username').value = '';
+  document.getElementById('admin-pin').value = '';
+});
+
+async function loadAllTechnicians() {
+  const label = document.getElementById('tech-count-label');
+  try {
+    const snapshot = await db.collection('users').where('role', '==', 'technician').get();
+    const list = document.getElementById('tech-list');
+    label.textContent = snapshot.size + ' technician' + (snapshot.size === 1 ? '' : 's');
+    list.innerHTML = '';
+
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      const levels = d.levels || {};
+      const passedCount = Object.values(levels).filter(l => l.passed).length;
+      const masterPassedCount = Object.values(d.masterLevels || {}).filter(m => m.passed).length;
+      const examHistory = (d.examSim && d.examSim.history) || [];
+      const lastExam = examHistory.length ? examHistory[examHistory.length - 1] : null;
+
+      const card = document.createElement('div');
+      card.className = 'tech-card';
+      card.innerHTML = `
+        <div class="tech-name">${d.displayName || d.username}</div>
+        <div class="tech-username">@${d.username}</div>
+        <div class="stat-row">
+          <div class="stat"><b>${passedCount}/30</b> levels passed</div>
+          <div class="stat"><b>${masterPassedCount}/6</b> master levels</div>
+          <div class="stat"><b>${d.tokens || 0}</b> tokens</div>
+          <div class="stat">${d.examSim && d.examSim.certDate ? '✅ Certified' : '— Not yet certified'}</div>
+        </div>
+        <div class="progress-bar-mini"><div style="width:${(passedCount/30*100)}%"></div></div>
+        ${lastExam ? `<div class="stat" style="margin-top:8px;">Last Exam Sim: ${lastExam.score}% (${new Date(lastExam.date).toLocaleDateString()})</div>` : ''}
+        ${(d.badges && d.badges.length) ? `<div class="badges">${d.badges.map(b => `<span class="badge-chip">${b}</span>`).join('')}</div>` : ''}
+      `;
+      list.appendChild(card);
+    });
+  } catch (err) {
+    console.error('Failed to load technicians:', err);
+    label.textContent = 'Error loading data (' + err.code + ')';
+    document.getElementById('tech-list').innerHTML =
+      '<p class="error">Could not load technician data. This usually means the Firestore security rules need to be republished — check Firebase Console → Firestore Database → Rules.</p>';
+  }
+}
+</script>
+</body>
+</html>

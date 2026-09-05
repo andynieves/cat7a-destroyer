@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Hardcoded admin UID allowlist — update this array with your own UID
+    // after you create your account (Firebase Console > Authentication > Users).
+    function isAdmin() {
+      return request.auth != null && request.auth.uid in [
+        "PASTE_YOUR_ADMIN_UID_HERE"
+      ];
+    }
+
+    match /users/{userId} {
+      // A technician can read and write only their own document.
+      // An admin can read every document, but still cannot write to
+      // technicians' documents directly from the client (all writes to a
+      // user's own progress happen through their own authenticated session).
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow write: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

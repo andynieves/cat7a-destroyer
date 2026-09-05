@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Cat 7A Destroyer</title>
+<meta name="theme-color" content="#1D364B">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cat 7A Destroyer">
+<style>
+  :root{
+    --navy-dark:#1D364B; --navy-bg:#2A5073; --navy-card:#354C61;
+    --gold:#E7B44A; --muted:#92A3B5; --success:#77DA89; --error:#E05252;
+    --text:#FFFFFF;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%; overscroll-behavior:none;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--navy-bg); color:var(--text); overflow:hidden;
+    touch-action:manipulation;
+  }
+  #app{
+    position:fixed; inset:0; display:flex; flex-direction:column;
+    padding-top:env(safe-area-inset-top);
+    padding-bottom:env(safe-area-inset-bottom);
+    padding-left:env(safe-area-inset-left);
+    padding-right:env(safe-area-inset-right);
+  }
+  .screen{flex:1; display:none; flex-direction:column; overflow-y:auto; -webkit-overflow-scrolling:touch;}
+  .screen.active{display:flex;}
+
+  header.bar{
+    background:var(--navy-dark); padding:16px 20px; display:flex; align-items:center;
+    justify-content:space-between; flex-shrink:0; box-shadow:0 2px 8px rgba(0,0,0,.2);
+  }
+  header.bar h1{font-size:18px; margin:0; font-weight:700;}
+  .score-pill{
+    background:var(--navy-card); border:1px solid var(--gold); color:var(--gold);
+    border-radius:20px; padding:6px 14px; font-size:13px; font-weight:600;
+  }
+  .icon-btn{
+    background:none; border:none; color:var(--muted); font-size:22px; padding:6px;
+    cursor:pointer; line-height:1;
+  }
+
+  /* ---- Auth screen ---- */
+  #screen-auth{align-items:center; justify-content:center; padding:32px 24px; text-align:center;}
+  #screen-auth .logo{font-size:44px; margin-bottom:8px;}
+  #screen-auth h2{margin:0 0 4px; font-size:22px;}
+  #screen-auth p.sub{color:var(--muted); margin:0 0 28px; font-size:14px;}
+  .authform{width:100%; max-width:340px; display:flex; flex-direction:column; gap:12px;}
+  input[type=text], input[type=tel]{
+    background:var(--navy-card); border:1px solid var(--muted); color:var(--text);
+    border-radius:10px; padding:14px 16px; font-size:16px; width:100%;
+  }
+  input::placeholder{color:var(--muted);}
+  .btn{
+    background:var(--gold); color:var(--navy-dark); border:none; border-radius:10px;
+    padding:14px; font-size:16px; font-weight:700; cursor:pointer; min-height:44px;
+  }
+  .btn.secondary{background:transparent; color:var(--gold); border:1px solid var(--gold);}
+  .btn.ghost{background:transparent; color:var(--muted); border:1px solid var(--muted);}
+  .authtoggle{margin-top:16px; font-size:14px; color:var(--muted);}
+  .authtoggle a{color:var(--gold); text-decoration:none; font-weight:600;}
+  .error-msg{color:var(--error); font-size:13px; min-height:16px;}
+
+  /* ---- Dashboard ---- */
+  #dash-content{padding:16px; display:flex; flex-direction:column; gap:20px;}
+  .block-label{font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:4px 2px 0;}
+  .level-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:8px;}
+  .tile{
+    aspect-ratio:1; border-radius:12px; background:var(--navy-card); border:1px solid transparent;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    cursor:pointer; position:relative; gap:2px; padding:4px;
+  }
+  .tile .num{font-size:18px; font-weight:700;}
+  .tile .badge{position:absolute; top:4px; right:4px; font-size:13px;}
+  .tile.locked{opacity:.45; cursor:default;}
+  .tile.locked .num{color:var(--muted);}
+  .tile.passed{border-color:var(--success);}
+  .tile.passed .num{color:var(--success);}
+  .tile.unlocked-fresh{border-color:var(--gold);}
+  .master-tile{
+    border-radius:12px; background:linear-gradient(135deg,var(--navy-card),var(--navy-dark));
+    border:1px solid var(--gold); padding:14px; display:flex; align-items:center; justify-content:space-between;
+    cursor:pointer;
+  }
+  .master-tile.locked{opacity:.4; cursor:default; border-color:var(--muted);}
+  .master-tile .mtitle{font-weight:700; font-size:14px;}
+  .master-tile .msub{color:var(--muted); font-size:12px; margin-top:2px;}
+  .exam-tile{
+    border-radius:12px; background:var(--navy-dark); border:2px solid var(--gold); padding:16px;
+    display:flex; align-items:center; justify-content:space-between; cursor:pointer;
+  }
+  .exam-tile .etitle{font-weight:700; font-size:15px; color:var(--gold);}
+  .exam-tile .esub{color:var(--muted); font-size:12px; margin-top:2px;}
+  .tokens-row{
+    display:flex; align-items:center; gap:6px; font-size:13px; color:var(--gold);
+    font-weight:700;
+  }
+
+  /* ---- Quiz screen ---- */
+  #quiz-header{padding:14px 16px 10px; flex-shrink:0;}
+  .progress-track{height:8px; background:var(--navy-dark); border-radius:4px; overflow:hidden; margin-top:10px;}
+  .progress-fill{height:100%; background:var(--gold); border-radius:4px; transition:width .25s ease;}
+  #quiz-body{flex:1; padding:8px 20px 20px; display:flex; flex-direction:column;}
+  .qcard{background:var(--navy-card); border-radius:14px; padding:20px; margin-top:12px;}
+  .qtext{font-size:17px; line-height:1.4; font-weight:600;}
+  .options{display:flex; flex-direction:column; gap:10px; margin-top:20px;}
+  .opt{
+    background:var(--navy-card); border:1px solid var(--muted); color:var(--text);
+    border-radius:10px; padding:14px 16px; text-align:left; font-size:15px; cursor:pointer;
+    min-height:44px;
+  }
+  .opt.correct{border-color:var(--success); background:rgba(119,218,137,.15); color:var(--success);}
+  .opt.incorrect{border-color:var(--error); background:rgba(224,82,82,.15); color:var(--error);}
+  .opt.disabled{pointer-events:none;}
+  .feedback{margin-top:16px; padding:14px; border-radius:10px; font-size:14px; display:none;}
+  .feedback.show{display:block;}
+  .feedback.correct-fb{background:rgba(119,218,137,.12); border:1px solid var(--success); color:var(--success);}
+  .feedback.incorrect-fb{background:rgba(224,82,82,.12); border:1px solid var(--error); color:var(--error);}
+  #quiz-footer{padding:12px 20px 20px; flex-shrink:0;}
+
+  /* ---- Modal ---- */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.6); display:none;
+    align-items:center; justify-content:center; z-index:50; padding:24px;
+    padding-top:calc(24px + env(safe-area-inset-top));
+    padding-bottom:calc(24px + env(safe-area-inset-bottom));
+  }
+  .modal-overlay.show{display:flex;}
+  .modal-box{background:var(--navy-card); border-radius:14px; padding:24px; max-width:320px; width:100%; text-align:center;}
+  .modal-box h3{margin:0 0 8px;}
+  .modal-box p{color:var(--muted); font-size:14px; margin:0 0 20px;}
+  .modal-actions{display:flex; flex-direction:column; gap:10px;}
+
+  /* ---- Results ---- */
+  #results-body{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 24px; text-align:center; gap:8px;}
+  .result-emoji{font-size:52px;}
+  .result-score{font-size:36px; font-weight:800;}
+  .result-msg{color:var(--muted); font-size:15px; max-width:320px; line-height:1.5;}
+
+  /* ---- Token prize reveal (the "won something" moment) ---- */
+  .token-reveal{
+    display:flex; flex-direction:column; align-items:center; gap:4px; margin:10px 0 14px;
+    padding:18px 28px; border-radius:16px;
+    background:linear-gradient(160deg, rgba(231,180,74,.18), rgba(231,180,74,.05));
+    border:1.5px solid var(--gold);
+    box-shadow:0 0 0 0 rgba(231,180,74,.5);
+  }
+  .token-reveal.pop{
+    animation:token-glow 1.4s ease-out 1;
+  }
+  .token-confetti{font-size:15px; letter-spacing:6px; opacity:.9;}
+  .token-coin{
+    font-size:56px; display:inline-block;
+  }
+  .token-reveal.pop .token-coin{
+    animation:token-pop .6s cubic-bezier(.34,1.56,.64,1) 1, token-spin 1.6s ease-in-out .6s 1;
+  }
+  .token-label{color:var(--gold); font-weight:800; font-size:16px; margin-top:2px;}
+  .token-sub{color:var(--muted); font-size:12px;}
+  @keyframes token-pop{
+    0%{transform:scale(0) rotate(-20deg); opacity:0;}
+    60%{transform:scale(1.3) rotate(8deg); opacity:1;}
+    100%{transform:scale(1) rotate(0deg);}
+  }
+  @keyframes token-spin{
+    0%{transform:rotateY(0deg);}
+    100%{transform:rotateY(360deg);}
+  }
+  @keyframes token-glow{
+    0%{box-shadow:0 0 0 0 rgba(231,180,74,.6);}
+    40%{box-shadow:0 0 28px 6px rgba(231,180,74,.45);}
+    100%{box-shadow:0 0 0 0 rgba(231,180,74,0);}
+  }
+  .result-actions{width:100%; max-width:300px; display:flex; flex-direction:column; gap:10px; margin-top:24px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- AUTH SCREEN -->
+  <div class="screen active" id="screen-auth">
+    <div class="logo">🐀</div>
+    <h2 id="auth-title">Cat 7A Destroyer</h2>
+    <p class="sub" id="auth-sub">Log in to continue your training</p>
+    <div class="authform">
+      <input type="text" id="auth-username" placeholder="Username" autocapitalize="off" autocorrect="off">
+      <input type="tel" id="auth-pin" placeholder="6-digit PIN" inputmode="numeric" pattern="[0-9]*" maxlength="6">
+      <input type="text" id="auth-displayname" placeholder="Your name (first time only)" style="display:none;">
+      <div class="error-msg" id="auth-error"></div>
+      <button class="btn" id="auth-submit">Log In</button>
+    </div>
+    <div class="authtoggle" id="auth-toggle">New here? <a id="auth-toggle-link">Create an account</a></div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="screen" id="screen-dashboard">
+    <header class="bar">
+      <h1>Cat 7A Destroyer</h1>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div class="tokens-row">🪙 <span id="token-count">0</span></div>
+        <button class="icon-btn" id="logout-btn" title="Log out">⎋</button>
+      </div>
+    </header>
+    <div id="dash-content"></div>
+  </div>
+
+  <!-- QUIZ -->
+  <div class="screen" id="screen-quiz">
+    <div id="quiz-header">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <button class="icon-btn" id="quiz-exit-btn">✕</button>
+        <div class="score-pill" id="quiz-score-pill">0 / 0</div>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+    </div>
+    <div id="quiz-body">
+      <div class="qcard">
+        <div class="qtext" id="q-text"></div>
+        <div class="options" id="q-options"></div>
+        <div class="feedback" id="q-feedback"></div>
+      </div>
+    </div>
+    <div id="quiz-footer">
+      <button class="btn" id="next-btn" style="display:none;">Next</button>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="screen" id="screen-results">
+    <div id="results-body">
+      <div class="result-emoji" id="result-emoji">🎉</div>
+      <div class="result-score" id="result-score">0%</div>
+      <div class="token-reveal" id="token-reveal" style="display:none;">
+        <div class="token-confetti">🎊 ✨ 🎊</div>
+        <div class="token-coin">🪙</div>
+        <div class="token-label" id="token-reveal-label">+1 Token Earned!</div>
+        <div class="token-sub">Added to your stash</div>
+      </div>
+      <div class="result-msg" id="result-msg"></div>
+      <div class="result-actions">
+        <button class="btn" id="result-primary-btn">Continue</button>
+        <button class="btn secondary" id="result-retake-btn">Retake</button>
+        <button class="btn ghost" id="result-dash-btn">Back to Dashboard</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- EXIT MODAL -->
+<div class="modal-overlay" id="exit-modal">
+  <div class="modal-box">
+    <h3>Leave quiz?</h3>
+    <p>Your progress on this attempt won't be saved, but anything you've already unlocked stays unlocked.</p>
+    <div class="modal-actions">
+      <button class="btn" id="exit-confirm-btn">Leave</button>
+      <button class="btn ghost" id="exit-cancel-btn">Keep Going</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script src="questions.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
